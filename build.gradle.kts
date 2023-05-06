@@ -2,6 +2,7 @@ import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
 plugins {
     kotlin("multiplatform")
+    kotlin("plugin.serialization")
     id("org.jetbrains.compose")
 }
 
@@ -20,9 +21,16 @@ kotlin {
         withJava()
     }
     sourceSets {
+        val commonMain by getting {
+            dependencies {
+                implementation(libs.kotlinx.coroutines)
+                implementation(libs.kotlinx.serialization.json)
+            }
+        }
         val jvmMain by getting {
             dependencies {
                 implementation(compose.desktop.currentOs)
+                implementation(libs.kotlinx.coroutines)
             }
         }
         val jvmTest by getting
