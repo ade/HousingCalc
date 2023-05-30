@@ -11,6 +11,7 @@ class CalcViewModel {
         input = CalcInputUiState(
             purchasePriceText = "1500000",
             salePriceText = "2000000",
+            deferSalesTax = true,
             loansRemainingText = "1000000",
             extraDepositText = "100000",
             householdIncomeAfterTax = "54000",
@@ -56,6 +57,9 @@ class CalcViewModel {
             is CalcUiEvent.EditPantbrevSum -> _uiState.update {
                 it.copy(input = it.input.copy(objectPantbrev = event.value))
             }
+            is CalcUiEvent.ToggleDeferSalesTax -> _uiState.update {
+                it.copy(input = it.input.copy(deferSalesTax = !it.input.deferSalesTax))
+            }
         }
 
         refresh()
@@ -69,7 +73,7 @@ class CalcViewModel {
         val salesPrice = snapshot.salePriceText.toIntOrNull()
             ?: return
 
-        val extraDeposit = snapshot.extraDepositText.toIntOrNull()
+        val savingsCapital = snapshot.extraDepositText.toIntOrNull()
             ?: return
 
         val objectPrice = snapshot.objectPriceText.toIntOrNull()
@@ -84,17 +88,47 @@ class CalcViewModel {
         val incomeMonthlyAfterTax = snapshot.householdIncomeAfterTax.toIntOrNull()
             ?: return
 
-        val pantbrev = snapshot.objectPantbrev.toIntOrNull()
+        val existingPantbrev = snapshot.objectPantbrev.toIntOrNull()
             ?: return
+
+        val deferSalesTax = snapshot.deferSalesTax
 
         val interestRate = snapshot.interestRate
 
         val profits = if(salesPrice > purchasePrice) salesPrice - purchasePrice else 0
         val adjustedProfits = 22.0 / 30.0 * profits.toDouble()
-        val salesTax = adjustedProfits * 0.3
+        val salesTax = if(deferSalesTax) 0.0 else adjustedProfits * 0.3
         val carryOverAfterTax = salesPrice - salesTax - loanRemaining
-        val totalDeposit = extraDeposit + carryOverAfterTax
+
+        /*
+            Regel: Lagfart
+            Att få lagfart kostar 1,5 procent av antingen köpeskillingen eller taxeringsvärdet (det värde som är högst) i stämpelskatt.
+         */
+        val lagfart = objectPrice * 0.015
+
+        val depositBeforePantBrev = savingsCapital + carryOverAfterTax - lagfart
+
+        /*
+            Pantbrev
+            Pantbrev kostar 2 procent av pantbrevets belopp i stämpelskatt. Finns det redan uttagna pantbrev i fastigheten kan du använda dem.
+        */
+        val pantbrevFee = when {
+            objectPrice - depositBeforePantBrev - existingPantbrev > 0 -> (objectPrice - depositBeforePantBrev - existingPantbrev) * 0.02
+            else -> 0.0
+        }
+
+        val totalDeposit = depositBeforePantBrev - pantbrevFee
         val loanAmount = objectPrice - totalDeposit
+
+        val loanRatioPercent = (loanAmount / objectPrice) * 100
+
+        val problems = mutableListOf<CalcUiProblems>()
+
+        if(loanRatioPercent > 85)
+            problems.add(CalcUiProblems.LoanMoreThan85Percent)
+
+        val minDeposit = objectPrice * 0.15
+
         val yearlyInterest = loanAmount * (interestRate.toDouble() / 100)
         val monthlyPaymentInterest = yearlyInterest/12
 
@@ -134,21 +168,6 @@ class CalcViewModel {
         val totalMonthlyPayment = monthlyPaymentInterest + amortizationMonthlyIncomeRule + amortizationMonthlyMarketValueRule
         val leftToLiveOn = incomeMonthlyAfterTax - totalMonthlyPayment
 
-        /*
-            Regel: Lagfart
-            Att få lagfart kostar 1,5 procent av antingen köpeskillingen eller taxeringsvärdet (det värde som är högst) i stämpelskatt.
-         */
-        val lagfart = objectPrice * 0.015
-
-        /*
-            Pantbrev
-            Pantbrev kostar 2 procent av pantbrevets belopp i stämpelskatt. Finns det redan uttagna pantbrev i fastigheten kan du använda dem.
-         */
-        val pantbrevFee = when {
-            loanAmount - pantbrev > 0 -> (loanAmount - pantbrev) * 0.02
-            else -> 0.0
-        }
-
         val oneTimeFees = lagfart + pantbrevFee
 
         /*
@@ -175,7 +194,10 @@ class CalcViewModel {
             pantbrevFee = df.format(pantbrevFee),
             oneTimeFees = df.format(oneTimeFees),
             incomeQuotaAmortizationBreakPoint = df.format(incomeQuotaRuleBreakpoint),
-            taxRebateYearly = df.format(taxRebate)
+            taxRebateYearly = df.format(taxRebate),
+            loanRatioPercent = df.format(loanRatioPercent),
+            minimumDeposit = df.format(minDeposit),
+            problems = problems
         )
 
         _uiState.update {

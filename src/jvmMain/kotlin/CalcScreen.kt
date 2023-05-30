@@ -1,3 +1,4 @@
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.*
 import androidx.compose.runtime.*
@@ -5,6 +6,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import se.ade.housingcosts.CalcUiEvent
+import se.ade.housingcosts.CalcUiProblems
 import se.ade.housingcosts.CalcUiState
 import java.math.RoundingMode
 import java.text.DecimalFormat
@@ -35,15 +37,15 @@ fun Economy(state: CalcUiState, eventSink: (event: CalcUiEvent) -> Unit) {
 
         Row {
             Column(modifier = Modifier.weight(1f)) {
-                Textual("deposit", state.input.extraDepositText) {
+                TextualInputCard("savings_capital", state.input.extraDepositText) {
                     eventSink(CalcUiEvent.EditDeposit(it))
                 }
                 Spacer(modifier = Modifier.height(16.dp))
-                Textual("household_income_before_tax", state.input.householdIncomePreTax) {
+                TextualInputCard("household_income_before_tax", state.input.householdIncomePreTax) {
                     eventSink(CalcUiEvent.EditIncomePreTax(it))
                 }
                 Spacer(modifier = Modifier.height(16.dp))
-                Textual("household_income_after_tax", state.input.householdIncomeAfterTax) {
+                TextualInputCard("household_income_after_tax", state.input.householdIncomeAfterTax) {
                     eventSink(CalcUiEvent.EditIncomeAfterTax(it))
                 }
                 Spacer(modifier = Modifier.height(16.dp))
@@ -72,15 +74,34 @@ fun PreviousPlace(state: CalcUiState, eventSink: (event: CalcUiEvent) -> Unit) {
 
         Row() {
             Column(modifier = Modifier.weight(1f)) {
-                Textual("purchase_price", state.input.purchasePriceText) {
+                TextualInputCard("purchase_price", state.input.purchasePriceText) {
                     eventSink(CalcUiEvent.EditPurchasePrice(it))
                 }
                 Spacer(modifier = Modifier.height(16.dp))
-                Textual("sale_price", state.input.salePriceText) {
-                    eventSink(CalcUiEvent.EditSalePrice(it))
+
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(text = context.strings["sale_price"])
+                            Spacer(modifier = Modifier.weight(1f))
+                            TextField(
+                                modifier = Modifier.width(120.dp),
+                                value = state.input.salePriceText,
+                                onValueChange = { eventSink(CalcUiEvent.EditSalePrice(state.input.salePriceText)) }
+                            )
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(checked = state.input.deferSalesTax, onCheckedChange = {
+                                eventSink(CalcUiEvent.ToggleDeferSalesTax)
+                            })
+                            Text(modifier = Modifier.clickable { eventSink(CalcUiEvent.ToggleDeferSalesTax) }.padding(8.dp),
+                                text = context.strings["defer_sales_tax"])
+                        }
+                    }
                 }
+
                 Spacer(modifier = Modifier.height(16.dp))
-                Textual("loan_remaining", state.input.loansRemainingText) {
+                TextualInputCard("loan_remaining", state.input.loansRemainingText) {
                     eventSink(CalcUiEvent.EditLoanRemaining(it))
                 }
             }
@@ -110,11 +131,11 @@ fun ObjectInfo(state: CalcUiState, eventSink: (event: CalcUiEvent) -> Unit) {
 
         Row() {
             Column(modifier = Modifier.weight(1f)) {
-                Textual("purchase_price", state.input.objectPriceText) {
+                TextualInputCard("purchase_price", state.input.objectPriceText) {
                     eventSink(CalcUiEvent.EditObjectPrice(it))
                 }
                 Spacer(modifier = Modifier.height(16.dp))
-                Textual("pantbrev_sum", state.input.objectPantbrev) {
+                TextualInputCard("pantbrev_sum", state.input.objectPantbrev) {
                     eventSink(CalcUiEvent.EditPantbrevSum(it))
                 }
             }
@@ -135,6 +156,7 @@ fun Results(state: CalcUiState, eventSink: (event: CalcUiEvent) -> Unit) {
                 Card {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(context.strings["loan_amount"] + ": " + state.result.loanAmountText)
+                        Text("${context.strings["loan_ratio"]}: ${state.result.loanRatioPercent}%")
                         Text(context.strings["interest_sum_yearly"] + ": " + state.result.yearlyInterest)
                         Text(context.strings["monthly_payment_interest"] + ": " + state.result.monthlyPaymentInterest)
                         Text(context.strings["tax_rebate_yearly"] + ": " + state.result.taxRebateYearly)
@@ -155,13 +177,28 @@ fun Results(state: CalcUiState, eventSink: (event: CalcUiEvent) -> Unit) {
                         Text(context.strings["one_time_fees_total"] + ": " + state.result.oneTimeFees)
                     }
                 }
+                if(state.result.problems.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Card {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(style = MaterialTheme.typography.h6, text = context.strings["problems"])
+                            state.result.problems.forEach {
+                                val text = when(it) {
+                                    is CalcUiProblems.LoanMoreThan85Percent -> context.strings["loan_ratio_too_high"]
+                                }
+
+                                Text(text = "- $text")
+                            }
+                        }
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-fun Textual(label: String, value: String, onChange: (String) -> Unit) {
+fun TextualInputCard(label: String, value: String, onChange: (String) -> Unit) {
     val context = LocalContext.current
     val labelText: String = context.strings[label] as? String ?: ""
     Card(modifier = Modifier.fillMaxWidth()) {

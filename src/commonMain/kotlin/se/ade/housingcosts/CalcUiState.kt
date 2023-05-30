@@ -11,6 +11,7 @@ data class CalcUiState(
 data class CalcInputUiState(
     val purchasePriceText: String,
     val salePriceText: String,
+    val deferSalesTax: Boolean,
     val loansRemainingText: String,
     val extraDepositText: String,
     val objectPriceText: String,
@@ -36,5 +37,8 @@ data class CalcResultUiState(
     val pantbrevFee: String = "",
     val oneTimeFees: String = "",
     val incomeQuotaAmortizationBreakPoint: String = "",
-    val taxRebateYearly: String = ""
+    val taxRebateYearly: String = "",
+    val loanRatioPercent: String = "",
+    val minimumDeposit: String = "",
+    val problems: List<CalcUiProblems> = listOf()
 )

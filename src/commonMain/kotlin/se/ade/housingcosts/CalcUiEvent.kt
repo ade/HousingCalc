@@ -10,4 +10,6 @@ sealed class CalcUiEvent {
     data class ChangeInterestRate(val value: Float) : CalcUiEvent()
     data class EditObjectPrice(val value: String) : CalcUiEvent()
     data class EditPantbrevSum(val value: String) : CalcUiEvent()
+
+    object ToggleDeferSalesTax: CalcUiEvent()
 }
